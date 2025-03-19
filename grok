@@ -1,0 +1,151 @@
+<!-- src/components/Postcard.vue -->
+<script setup>
+import { ref } from 'vue';
+
+const message = ref('Hello from Postcard!');
+</script>
+
+<template>
+  <div class="postcard">
+    <h3>明信片</h3>
+    <p>{{ message }}</p>
+    <button @click="message = 'Button clicked!'">Click me</button>
+  </div>
+</template>
+
+<style scoped>
+.postcard {
+  border: 1px solid #ccc;
+  padding: 10px;
+  background-color: #f0f0f0;
+}
+</style>
+
+
+
+<!-- src/components/Editor.vue -->
+<script setup>
+import { ref, onMounted } from 'vue';
+import grapesjs from 'grapesjs';
+import 'grapesjs/dist/css/grapes.min.css';
+import { createApp } from 'vue';
+import Postcard from './Postcard.vue'; // 导入 Postcard 组件
+
+const editorRef = ref(null);
+
+onMounted(() => {
+  const editor = grapesjs.init({
+    container: editorRef.value,
+    height: '600px',
+    width: '100%',
+    storageManager: false,
+    panels: { defaults: [] },
+    blockManager: {
+      appendTo: '#blocks',
+      blocks: [
+        {
+          id: 'postcard',
+          label: 'Postcard',
+          content: { type: 'postcard' }, // 自定义类型
+          category: 'Vue Components',
+        },
+        {
+          id: 'section',
+          label: 'Section',
+          content: '<div class="section" data-gjs-droppable=".postcard-container"><h2>Section Block</h2></div>',
+          category: 'Basic',
+        },
+      ],
+    },
+  });
+
+  // 定义自定义组件类型 'postcard'
+  editor.DomComponents.addType('postcard', {
+    model: {
+      defaults: {
+        tagName: 'div',
+        draggable: true, // 允许拖拽
+        droppable: false, // 不允许其他组件放入其中（可根据需求调整）
+        attributes: { class: 'postcard-container' },
+      },
+    },
+    view: {
+      onRender({ el }) {
+        // 创建 Vue 应用并挂载 Postcard 组件
+        const app = createApp(Postcard);
+        app.mount(el);
+      },
+    },
+  });
+});
+</script>
+
+<template>
+  <div>
+    <h2>GrapesJS 编辑器</h2>
+    <div id="blocks" style="margin-bottom: 10px;"></div>
+    <div ref="editorRef" style="border: 1px solid #ccc; padding: 10px;"></div>
+  </div>
+</template>
+
+<style>
+.section {
+  border: 2px dashed #aaa;
+  padding: 20px;
+  min-height: 100px;
+}
+</style>
+
+
+<!-- src/App.vue -->
+<script setup>
+import Editor from './components/Editor.vue';
+</script>
+
+<template>
+  <Editor />
+</template>
+
+
+
+
+import Button from './Button.vue'; // 导入 Button 组件
+
+// 在 blockManager.blocks 中添加
+blocks: [
+  {
+    id: 'postcard',
+    label: 'Postcard',
+    content: { type: 'postcard' },
+    category: 'Vue Components',
+  },
+  {
+    id: 'button',
+    label: 'Custom Button',
+    content: { type: 'button' },
+    category: 'Vue Components',
+  },
+  {
+    id: 'section',
+    label: 'Section',
+    content: '<div class="section" data-gjs-droppable=".postcard-container, .custom-button"><h2>Section Block</h2></div>',
+    category: 'Basic',
+  },
+],
+
+// 定义新的组件类型 'button'
+editor.DomComponents.addType('button', {
+  model: {
+    defaults: {
+      tagName: 'div',
+      draggable: true,
+      attributes: { class: 'custom-button-container' },
+    },
+  },
+  view: {
+    onRender({ el }) {
+      const app = createApp(Button);
+      app.mount(el);
+    },
+  },
+});
