@@ -1,0 +1,167 @@
+<!-- 定义支持插槽的容器组件 -->
+<template>
+  <div class="slot-container" :data-max-nesting="maxNesting">
+    <div v-if="showHeader" class="header">
+      <slot name="header"></slot>
+    </div>
+    <div class="body" :class="{ 'disable-drop': !allowDrop }">
+      <!-- 动态插槽（接受特定类型子组件） -->
+      <slot :allowedTypes="allowedTypes"></slot>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const props = defineProps({
+  allowedTypes: { type: Array, default: () => [] }, // 允许拖入的组件类型
+  maxNesting: { type: Number, default: 2 },         // 最大嵌套层数
+  showHeader: { type: Boolean, default: true }      // 条件渲染：是否显示头部
+});
+
+const allowDrop = ref(true); // 条件控制是否允许拖入
+</script>
+
+<style scoped>
+.slot-container { border: 1px dashed #ccc; padding: 10px; }
+.disable-drop { opacity: 0.5; pointer-events: none; }
+</style>
+
+
+import { createApp } from 'vue';
+import SlotContainer from './components/SlotContainer.vue';
+
+// 1. 将 Vue3 组件注册为可拖拽 Block
+const vueApp = createApp({});
+vueApp.component('SlotContainer', SlotContainer);
+const slotComponent = vueApp._component.SlotContainer;
+
+// 2. 初始化 GrapesJS 编辑器
+const editor = grapesjs.init({
+  container: '#gjs',
+  fromElement: true,
+  storageManager: false,
+  
+  // 注册自定义 Block
+  blockManager: {
+    blocks: [
+      {
+        id: 'slot-container',
+        label: '插槽容器',
+        content: {
+          type: 'vue-component', // 自定义类型标识
+          component: 'SlotContainer',
+          attributes: { 
+            'allowed-types': ['text-block', 'image-block'], // 允许的子组件类型
+            'data-max-nesting': 2
+          }
+        }
+      },
+      {
+        id: 'text-block',
+        label: '文本块',
+        content: '<div data-gjs-type="text">默认文本</div>'
+      }
+    ]
+  },
+  
+  // 自定义组件解析器（关键：将 Vue3 组件渲染到画布）
+  componentManager: {
+    components: {
+      'vue-component': {
+        model: {
+          init() {
+            this.listenTo(this, 'change:attributes', this.handleAttrChange);
+          },
+          handleAttrChange() {
+            // 更新时触发条件渲染（如禁用拖入）
+            if (this.get('allowDrop') === false) {
+              this.view.el.classList.add('disable-drop');
+            }
+          }
+        },
+        view: {
+          onRender() {
+            const { component, attributes } = this.model;
+            const vueEl = document.createElement('div');
+            // 动态挂载 Vue3 组件
+            createApp(slotComponent, attributes).mount(vueEl);
+            this.el.appendChild(vueEl);
+          }
+        }
+      }
+    }
+  }
+});
+
+// 3. 拖入类型限制逻辑
+editor.on('block:drag:start', (block) => {
+  const target = editor.getSelected();
+  if (target?.get('type') === 'vue-component') {
+    const allowedTypes = target.get('attributes')['allowed-types'];
+    if (!allowedTypes.includes(block.getId())) {
+      editor.Modal.alert(`仅允许拖入类型：${allowedTypes.join(', ')}`);
+      return false; // 阻止拖拽
+    }
+  }
+});
+
+// 4. 嵌套层数控制
+editor.on('component:add', (component) => {
+  let depth = 0, parent = component.parent();
+  while (parent) { depth++; parent = parent.parent(); }
+  const maxNesting = component.parent()?.get('attributes')['data-max-nesting'];
+  if (maxNesting && depth > maxNesting) {
+    component.remove();
+    editor.Modal.alert(`嵌套层数超过限制（最大 ${maxNesting} 层）`);
+  }
+});
+
+// 5. 条件渲染示例：根据属性动态禁用插槽
+editor.on('component:update:attributes', (component) => {
+  if (component.get('type') === 'vue-component') {
+    const allowDrop = component.get('allowDrop');
+    component.view.el.querySelector('.body').style.pointerEvents = allowDrop ? 'all' : 'none';
+  }
+});
+
+
+
+
+// 在 Vue3 组件中通过 Props 控制
+editor.getSelected().set('attributes', { 
+  showHeader: false,  // 隐藏头部插槽
+  allowDrop: editor.getSelected().get('components').length >= 3 // 子组件超过3个则禁用拖入
+});
+
+
+// 1. 存储页面配置
+const pageData = editor.getComponents();
+localStorage.setItem('pageConfig', JSON.stringify(pageData));
+
+// 2. 运行时解析（结合 Pinia）
+import { defineStore } from 'pinia';
+export const usePageStore = defineStore('page', {
+  state: () => ({ components: [] }),
+  actions: {
+    loadConfig() {
+      const config = JSON.parse(localStorage.getItem('pageConfig'));
+      this.components = config.map(component => ({
+        is: component.type === 'vue-component' ? SlotContainer : 'div',
+        props: component.attributes
+      }));
+    }
+  }
+});
+
+// 3. 动态渲染组件
+<template>
+  <component 
+    v-for="(comp, index) in page.components" 
+    :is="comp.is" 
+    :key="index" 
+    v-bind="comp.props"
+  />
+</template>
+
