@@ -1,0 +1,183 @@
+<!-- src/components/Postcard.vue -->
+<script setup>
+import { ref } from 'vue';
+
+const message = ref('Hello from Postcard!');
+</script>
+
+<template>
+  <div class="postcard">
+    <h3>明信片</h3>
+    <p>{{ message }}</p>
+    <button @click="message = 'Button clicked!'">Click me</button>
+    <div class="slot-area" data-gjs-droppable="true">
+      <!-- 插槽区域，允许拖入块 -->
+      <slot></slot>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.postcard {
+  border: 1px solid #ccc;
+  padding: 10px;
+  background-color: #f0f0f0;
+}
+
+.slot-area {
+  min-height: 100px;
+  border: 2px dashed #aaa;
+  padding: 10px;
+  margin-top: 10px;
+}
+</style>
+<!-- src/components/Editor.vue -->
+<script setup>
+import { ref, onMounted } from 'vue';
+import grapesjs from 'grapesjs';
+import 'grapesjs/dist/css/grapes.min.css';
+import { createApp } from 'vue';
+import Postcard from './Postcard.vue'; // 导入 Postcard 组件
+
+const editorRef = ref(null);
+
+onMounted(() => {
+  const editor = grapesjs.init({
+    container: editorRef.value,
+    height: '600px',
+    width: '100%',
+    storageManager: false,
+    panels: { defaults: [] },
+    blockManager: {
+      appendTo: '#blocks',
+      blocks: [
+        {
+          id: 'postcard',
+          label: 'Postcard',
+          content: { type: 'postcard' },
+          category: 'Vue Components',
+        },
+        {
+          id: 'text',
+          label: 'Text',
+          content: '<div class="text-block">Insert your text here</div>',
+          category: 'Basic',
+        },
+        {
+          id: 'image',
+          label: 'Image',
+          content: {
+            type: 'image',
+            src: 'https://via.placeholder.com/150',
+            attributes: { class: 'image-block' },
+          },
+          category: 'Basic',
+        },
+      ],
+    },
+  });
+
+  // 定义 Postcard 组件类型
+  editor.DomComponents.addType('postcard', {
+    model: {
+      defaults: {
+        tagName: 'div',
+        draggable: true,
+        droppable: false, // Postcard 本身不允许拖入任何块
+        attributes: { class: 'postcard-container' },
+        components: [
+          {
+            tagName: 'div',
+            attributes: { class: 'slot-area' },
+            droppable: '.text-block, .image-block', // 只允许特定块拖入插槽
+          },
+        ],
+      },
+    },
+    view: {
+      onRender({ el }) {
+        const app = createApp(Postcard);
+        app.mount(el); // 渲染 Postcard.vue
+      },
+    },
+  });
+
+  // 定义 text-block 类型
+  editor.DomComponents.addType('text-block', {
+    model: {
+      defaults: {
+        tagName: 'div',
+        draggable: true,
+        droppable: false,
+        attributes: { class: 'text-block' },
+      },
+    },
+  });
+
+  // 定义 image-block 类型
+  editor.DomComponents.addType('image-block', {
+    model: {
+      defaults: {
+        tagName: 'img',
+        draggable: true,
+        droppable: false,
+        attributes: { class: 'image-block' },
+      },
+    },
+  });
+});
+</script>
+
+<template>
+  <div>
+    <h2>GrapesJS 编辑器</h2>
+    <div id="blocks" style="margin-bottom: 10px;"></div>
+    <div ref="editorRef" style="border: 1px solid #ccc; padding: 10px;"></div>
+  </div>
+</template>
+
+<style>
+.text-block {
+  padding: 10px;
+  background-color: #e0e0e0;
+}
+
+.image-block {
+  width: 100%;
+  height: auto;
+}
+</style>
+
+
+<!-- src/App.vue -->
+<script setup>
+import Editor from './components/Editor.vue';
+</script>
+
+<template>
+  <Editor />
+</template>
+
+{
+  id: 'button',
+  label: 'Button',
+  content: '<button class="button-block">Click me</button>',
+  category: 'Basic',
+}
+
+
+droppable: '.text-block, .image-block, .button-block'
+
+
+editor.DomComponents.addType('button-block', {
+  model: {
+    defaults: {
+      tagName: 'button',
+      draggable: true,
+      droppable: false,
+      attributes: { class: 'button-block' },
+    },
+  },
+});
+
+
